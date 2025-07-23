@@ -63,7 +63,8 @@ router.post('/:id/submit', async (req, res) => {
       return res.status(400).json({ error: 'Missing student ID' });
     }
 
-    const { data, error } = await supabase
+    // Create submission in database
+    const { data: submission, error } = await supabase
       .from('submissions')
       .insert({
         assignment_id: id,
@@ -78,7 +79,7 @@ router.post('/:id/submit', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    res.json(data);
+    res.json(submission);
   } catch (error) {
     console.error('Error submitting assignment:', error);
     res.status(500).json({ error: 'Internal server error' });

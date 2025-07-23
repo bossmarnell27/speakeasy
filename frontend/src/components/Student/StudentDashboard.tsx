@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { VideoRecorder } from '../VideoRecorder';
 
 interface Assignment {
   id: string;
@@ -35,6 +36,7 @@ export function StudentDashboard() {
   const [classData, setClassData] = useState<ClassData | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [recordingFor, setRecordingFor] = useState<string | null>(null);
   const { user, signOut } = useAuth();
 
   useEffect(() => {
@@ -145,6 +147,75 @@ export function StudentDashboard() {
     }
   };
 
+  const handleVideoRecording = async (assignmentId: string, videoBlob: Blob) => {
+    if (!user) return;
+
+    setUploadingFor(assignmentId);
+    try {
+      // Get assignment and student details for metadata
+      const assignment = assignments.find(a => a.id === assignmentId);
+      
+      // Create FormData with video and metadata
+      const formData = new FormData();
+      formData.append('video', videoBlob, 'recording.webm');
+      formData.append('studentId', user.id);
+      formData.append('assignmentId', assignmentId);
+      formData.append('assignmentTitle', assignment?.title || 'Unknown Assignment');
+      formData.append('assignmentDescription', assignment?.description || '');
+      formData.append('submittedAt', new Date().toISOString());
+      formData.append('videoFormat', 'webm');
+      formData.append('videoSize', videoBlob.size.toString());
+
+      // Send directly to n8n webhook
+      const webhookResponse = await fetch('https://redclay.app.n8n.cloud/webhook-test/testai', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!webhookResponse.ok) {
+        throw new Error(`Webhook failed: ${webhookResponse.status}`);
+      }
+
+      // Also upload to Supabase for backup and create submission record
+      const fileName = `${user.id}/${assignmentId}/${Date.now()}.webm`;
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(fileName, videoBlob);
+
+      if (uploadError) {
+        console.warn('Supabase backup failed:', uploadError);
+        // Continue anyway since webhook succeeded
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('videos')
+        .getPublicUrl(fileName);
+
+      // Create submission record
+      const response = await fetch(`http://localhost:3001/api/assignments/${assignmentId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: user.id,
+          videoUrl: urlData.publicUrl,
+        }),
+      });
+
+      if (response.ok) {
+        fetchSubmissions();
+        setRecordingFor(null);
+        alert('Video recorded and sent for AI analysis successfully!');
+      }
+    } catch (error) {
+      console.error('Error processing recording:', error);
+      alert(`Error processing recording: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally {
+      setUploadingFor(null);
+    }
+  };
+
   const getSubmissionForAssignment = (assignmentId: string) => {
     return submissions.find(sub => sub.assignment_id === assignmentId);
   };
@@ -227,22 +298,68 @@ export function StudentDashboard() {
                       {submission.score && <p><strong>Score:</strong> {submission.score}/100</p>}
                     </div>
                   ) : (
-                    <div style={{ marginTop: '10px' }}>
-                      <label>Upload Video:</label>
-                      <input
-                        type="file"
-                        accept="video/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleVideoUpload(assignment.id, file);
-                          }
-                        }}
-                        disabled={uploadingFor === assignment.id}
-                        style={{ display: 'block', marginTop: '5px' }}
-                      />
-                      {uploadingFor === assignment.id && (
-                        <p style={{ color: '#007bff', marginTop: '5px' }}>Uploading...</p>
+                    <div style={{ marginTop: '15px' }}>
+                      {recordingFor === assignment.id ? (
+                        <div>
+                          <VideoRecorder
+                            onVideoRecorded={(videoBlob) => handleVideoRecording(assignment.id, videoBlob)}
+                            isUploading={uploadingFor === assignment.id}
+                          />
+                          <button
+                            onClick={() => setRecordingFor(null)}
+                            disabled={uploadingFor === assignment.id}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#6c757d',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: uploadingFor === assignment.id ? 'not-allowed' : 'pointer',
+                              marginTop: '10px',
+                              opacity: uploadingFor === assignment.id ? 0.6 : 1
+                            }}
+                          >
+                            Cancel Recording
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ marginBottom: '15px' }}>
+                            <button
+                              onClick={() => setRecordingFor(assignment.id)}
+                              disabled={uploadingFor === assignment.id}
+                              style={{
+                                padding: '12px 24px',
+                                backgroundColor: '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: uploadingFor === assignment.id ? 'not-allowed' : 'pointer',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                marginRight: '10px'
+                              }}
+                            >
+                              {uploadingFor === assignment.id ? 'Processing...' : 'Record Video Response'}
+                            </button>
+                          </div>
+                          
+                          <div style={{ borderTop: '1px solid #eee', paddingTop: '15px' }}>
+                            <label style={{ fontSize: '14px', color: '#666' }}>Or upload a video file:</label>
+                            <input
+                              type="file"
+                              accept="video/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleVideoUpload(assignment.id, file);
+                                }
+                              }}
+                              disabled={uploadingFor === assignment.id}
+                              style={{ display: 'block', marginTop: '5px' }}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

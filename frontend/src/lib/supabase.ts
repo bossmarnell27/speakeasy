@@ -74,6 +74,9 @@ export type Database = {
           score: number | null;
           feedback_json: any | null;
           submitted_at: string;
+          word_choice_feedback: string | null;
+          body_language_feedback: string | null;
+          filler_word_feedback: string | null;
         };
         Insert: {
           id?: string;
@@ -83,6 +86,9 @@ export type Database = {
           score?: number | null;
           feedback_json?: any | null;
           submitted_at?: string;
+          word_choice_feedback?: string | null;
+          body_language_feedback?: string | null;
+          filler_word_feedback?: string | null;
         };
         Update: {
           id?: string;
@@ -92,6 +98,9 @@ export type Database = {
           score?: number | null;
           feedback_json?: any | null;
           submitted_at?: string;
+          word_choice_feedback?: string | null;
+          body_language_feedback?: string | null;
+          filler_word_feedback?: string | null;
         };
       };
     };

@@ -16,6 +16,9 @@ interface Submission {
   score: number | null;
   feedback_json: any | null;
   submitted_at: string;
+  word_choice_feedback: string | null;
+  body_language_feedback: string | null;
+  filler_word_feedback: string | null;
   assignments: {
     title: string;
     description: string;
@@ -190,10 +193,35 @@ export function TeacherDashboard() {
                 {submission.score && (
                   <p><strong>Score:</strong> {submission.score}/100</p>
                 )}
+                {(submission.word_choice_feedback || submission.body_language_feedback || submission.filler_word_feedback) && (
+                  <div style={{ marginTop: '15px' }}>
+                    <strong>AI Analysis Feedback:</strong>
+                    <div style={{ marginTop: '10px' }}>
+                      {submission.word_choice_feedback && (
+                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+                          <strong style={{ color: '#1976d2' }}>Word Choice:</strong>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.word_choice_feedback}</p>
+                        </div>
+                      )}
+                      {submission.body_language_feedback && (
+                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f3e5f5', borderRadius: '4px' }}>
+                          <strong style={{ color: '#7b1fa2' }}>Body Language:</strong>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.body_language_feedback}</p>
+                        </div>
+                      )}
+                      {submission.filler_word_feedback && (
+                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff3e0', borderRadius: '4px' }}>
+                          <strong style={{ color: '#f57c00' }}>Filler Words:</strong>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.filler_word_feedback}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {submission.feedback_json && (
-                  <div>
-                    <strong>Feedback:</strong>
-                    <pre style={{ background: '#f8f9fa', padding: '10px', borderRadius: '4px', marginTop: '5px' }}>
+                  <div style={{ marginTop: '10px' }}>
+                    <strong>Additional Feedback:</strong>
+                    <pre style={{ background: '#f8f9fa', padding: '10px', borderRadius: '4px', marginTop: '5px', fontSize: '12px' }}>
                       {JSON.stringify(submission.feedback_json, null, 2)}
                     </pre>
                   </div>

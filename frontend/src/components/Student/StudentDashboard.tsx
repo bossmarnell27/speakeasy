@@ -221,7 +221,7 @@ export function StudentDashboard() {
       formData.append('videoSize', videoBlob.size.toString());
 
       // Step 4: Send to n8n webhook with submission ID
-      const webhookResponse = await fetch('https://redclay.app.n8n.cloud/webhook-test/testai', {
+      const webhookResponse = await fetch('https://merry-goblin-stable.ngrok-free.app/webhook-test/testai', {
         method: 'POST',
         body: formData
       });

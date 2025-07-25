@@ -29,6 +29,8 @@ interface Submission {
   };
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
 export function TeacherDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -47,28 +49,38 @@ export function TeacherDashboard() {
 
   const fetchAssignments = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/assignments');
-      const data = await response.json();
-      setAssignments(data);
+      const response = await fetch(`${API_BASE_URL}/api/assignments`);
+      if (response.ok) {
+        const data = await response.json();
+        setAssignments(data);
+      } else {
+        console.error('Failed to fetch assignments:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      alert('Unable to connect to server. Please ensure the backend is running on port 3001.');
     }
   };
 
   const fetchSubmissions = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/submissions?userId=${user?.id}&role=teacher`);
-      const data = await response.json();
-      setSubmissions(data);
+      const response = await fetch(`${API_BASE_URL}/api/submissions?userId=${user?.id}&role=teacher`);
+      if (response.ok) {
+        const data = await response.json();
+        setSubmissions(data);
+      } else {
+        console.error('Failed to fetch submissions:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error('Error fetching submissions:', error);
+      alert('Unable to connect to server. Please ensure the backend is running on port 3001.');
     }
   };
 
   const createAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3001/api/assignments', {
+      const response = await fetch(`${API_BASE_URL}/api/assignments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

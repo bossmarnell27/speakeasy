@@ -63,13 +63,13 @@ router.post('/:id/submit', async (req, res) => {
       return res.status(400).json({ error: 'Missing student ID' });
     }
 
-    // Create submission in database
+    // Create submission in database (videoUrl is optional now)
     const { data: submission, error } = await supabase
       .from('submissions')
       .insert({
         assignment_id: id,
         student_id: studentId,
-        video_url: videoUrl,
+        video_url: videoUrl || null,
         submitted_at: new Date().toISOString()
       })
       .select()
@@ -82,6 +82,33 @@ router.post('/:id/submit', async (req, res) => {
     res.json(submission);
   } catch (error) {
     console.error('Error submitting assignment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.patch('/:assignmentId/submissions/:submissionId', async (req, res) => {
+  try {
+    const { submissionId } = req.params;
+    const { videoUrl } = req.body;
+
+    if (!videoUrl) {
+      return res.status(400).json({ error: 'Missing video URL' });
+    }
+
+    const { data: submission, error } = await supabase
+      .from('submissions')
+      .update({ video_url: videoUrl })
+      .eq('id', submissionId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json(submission);
+  } catch (error) {
+    console.error('Error updating submission:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

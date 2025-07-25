@@ -33,6 +33,8 @@ interface ClassData {
   join_code: string;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
 export function StudentDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -43,47 +45,77 @@ export function StudentDashboard() {
   const { user, signOut } = useAuth();
 
   useEffect(() => {
+    checkServerConnection();
     fetchClassData();
     fetchAssignments();
     fetchSubmissions();
   }, []);
 
+  const checkServerConnection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Server connection successful:', data.message);
+      } else {
+        console.error('❌ Server health check failed:', response.status);
+        alert(`Server is not responding properly. Status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Cannot connect to server:', error);
+      alert(`Cannot connect to server at ${API_BASE_URL}. Please ensure the backend is running on port 3001.`);
+    }
+  };
+
   const fetchClassData = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/class');
+      const response = await fetch(`${API_BASE_URL}/api/class`);
       if (response.ok) {
         const data = await response.json();
         setClassData(data);
+      } else {
+        console.error('Failed to fetch class data:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching class data:', error);
+      alert('Unable to connect to server. Please ensure the backend is running on port 3001.');
     }
   };
 
   const fetchAssignments = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/assignments');
-      const data = await response.json();
-      setAssignments(data);
+      const response = await fetch(`${API_BASE_URL}/api/assignments`);
+      if (response.ok) {
+        const data = await response.json();
+        setAssignments(data);
+      } else {
+        console.error('Failed to fetch assignments:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      alert('Unable to connect to server. Please ensure the backend is running on port 3001.');
     }
   };
 
   const fetchSubmissions = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/submissions?userId=${user?.id}&role=student`);
-      const data = await response.json();
-      setSubmissions(data);
+      const response = await fetch(`${API_BASE_URL}/api/submissions?userId=${user?.id}&role=student`);
+      if (response.ok) {
+        const data = await response.json();
+        setSubmissions(data);
+      } else {
+        console.error('Failed to fetch submissions:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error('Error fetching submissions:', error);
+      alert('Unable to connect to server. Please ensure the backend is running on port 3001.');
     }
   };
 
   const joinClass = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3001/api/class/join', {
+      const response = await fetch(`${API_BASE_URL}/api/class/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +159,7 @@ export function StudentDashboard() {
         .from('videos')
         .getPublicUrl(fileName);
 
-      const response = await fetch(`http://localhost:3001/api/assignments/${assignmentId}/submit`, {
+      const response = await fetch(`${API_BASE_URL}/api/assignments/${assignmentId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,21 +187,40 @@ export function StudentDashboard() {
 
     setUploadingFor(assignmentId);
     try {
-      // Get assignment and student details for metadata
+      // Step 1: Create submission record first (without video URL)
+      const submissionResponse = await fetch(`${API_BASE_URL}/api/assignments/${assignmentId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: user.id,
+        }),
+      });
+
+      if (!submissionResponse.ok) {
+        throw new Error(`Failed to create submission: ${submissionResponse.status}`);
+      }
+
+      const submission = await submissionResponse.json();
+      const submissionId = submission.id;
+
+      // Step 2: Get assignment details for metadata
       const assignment = assignments.find(a => a.id === assignmentId);
       
-      // Create FormData with video and metadata
+      // Step 3: Create FormData with video, metadata, and submission ID
       const formData = new FormData();
       formData.append('video', videoBlob, 'recording.webm');
       formData.append('studentId', user.id);
       formData.append('assignmentId', assignmentId);
+      formData.append('submissionId', submissionId);
       formData.append('assignmentTitle', assignment?.title || 'Unknown Assignment');
       formData.append('assignmentDescription', assignment?.description || '');
       formData.append('submittedAt', new Date().toISOString());
       formData.append('videoFormat', 'webm');
       formData.append('videoSize', videoBlob.size.toString());
 
-      // Send directly to n8n webhook
+      // Step 4: Send to n8n webhook with submission ID
       const webhookResponse = await fetch('https://redclay.app.n8n.cloud/webhook-test/testai', {
         method: 'POST',
         body: formData
@@ -179,7 +230,7 @@ export function StudentDashboard() {
         throw new Error(`Webhook failed: ${webhookResponse.status}`);
       }
 
-      // Also upload to Supabase for backup and create submission record
+      // Step 5: Upload to Supabase for backup
       const fileName = `${user.id}/${assignmentId}/${Date.now()}.webm`;
       const { error: uploadError } = await supabase.storage
         .from('videos')
@@ -190,23 +241,28 @@ export function StudentDashboard() {
         // Continue anyway since webhook succeeded
       }
 
+      // Step 6: Update submission record with video URL
       const { data: urlData } = supabase.storage
         .from('videos')
         .getPublicUrl(fileName);
 
-      // Create submission record
-      const response = await fetch(`http://localhost:3001/api/assignments/${assignmentId}/submit`, {
-        method: 'POST',
+      const updateResponse = await fetch(`${API_BASE_URL}/api/assignments/${assignmentId}/submissions/${submissionId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          studentId: user.id,
           videoUrl: urlData.publicUrl,
         }),
       });
 
-      if (response.ok) {
+      if (updateResponse.ok) {
+        fetchSubmissions();
+        setRecordingFor(null);
+        alert('Video recorded and sent for AI analysis successfully!');
+      } else {
+        console.warn('Failed to update submission with video URL');
+        // Still consider success since video was sent to n8n
         fetchSubmissions();
         setRecordingFor(null);
         alert('Video recorded and sent for AI analysis successfully!');

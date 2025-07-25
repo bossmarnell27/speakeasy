@@ -9,7 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 router.get('/', async (req, res) => {
   try {
-    const { userId, role } = req.query;
+    const { userId, role, assignmentId } = req.query;
 
     if (!userId || !role) {
       return res.status(400).json({ error: 'Missing user ID or role' });
@@ -31,6 +31,11 @@ router.get('/', async (req, res) => {
 
     if (role === 'student') {
       query = query.eq('student_id', userId);
+    }
+
+    // Filter by assignment if assignmentId is provided
+    if (assignmentId) {
+      query = query.eq('assignment_id', assignmentId);
     }
 
     const { data, error } = await query.order('submitted_at', { ascending: false });

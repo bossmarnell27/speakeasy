@@ -34,6 +34,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 export function TeacherDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [assignmentSubmissions, setAssignmentSubmissions] = useState<Submission[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAssignment, setNewAssignment] = useState({
     title: '',
@@ -46,6 +48,39 @@ export function TeacherDashboard() {
     fetchAssignments();
     fetchSubmissions();
   }, []);
+
+  const fetchSubmissionsForAssignment = async (assignmentId: string) => {
+    try {
+      console.log('Fetching submissions for assignment:', assignmentId, 'user:', user?.id);
+      const response = await fetch(`${API_BASE_URL}/api/submissions?assignmentId=${assignmentId}&role=teacher&userId=${user?.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Assignment submissions received:', data);
+        setAssignmentSubmissions(data);
+      } else {
+        console.error('Failed to fetch assignment submissions:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Response body:', errorText);
+      }
+    } catch (error) {
+      console.error('Error fetching assignment submissions:', error);
+      alert('Unable to connect to server. Please ensure the backend is running on port 3001.');
+    }
+  };
+
+  const viewAssignmentSubmissions = async (assignment: Assignment) => {
+    setSelectedAssignment(assignment);
+    await fetchSubmissionsForAssignment(assignment.id);
+  };
+
+  const backToAssignments = () => {
+    setSelectedAssignment(null);
+    setAssignmentSubmissions([]);
+  };
+
+  const getSubmissionCount = (assignmentId: string) => {
+    return submissions.filter(sub => sub.assignment_id === assignmentId).length;
+  };
 
   const fetchAssignments = async () => {
     try {
@@ -101,7 +136,18 @@ export function TeacherDashboard() {
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1>Teacher Dashboard</h1>
+        <div>
+          <h1>Teacher Dashboard</h1>
+          {selectedAssignment && (
+            <nav style={{ fontSize: '14px', color: '#666', marginTop: '5px' }}>
+              <button onClick={backToAssignments} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', padding: 0 }}>
+                Assignments
+              </button>
+              <span style={{ margin: '0 8px' }}>›</span>
+              <span>{selectedAssignment.title}</span>
+            </nav>
+          )}
+        </div>
         <button
           onClick={signOut}
           style={{
@@ -117,8 +163,8 @@ export function TeacherDashboard() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-        {/* Assignments Section */}
+      {!selectedAssignment ? (
+        // Assignments List View
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2>Assignments</h2>
@@ -179,70 +225,142 @@ export function TeacherDashboard() {
             </form>
           )}
 
-          <div>
-            {assignments.map((assignment) => (
-              <div key={assignment.id} style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '10px' }}>
-                <h3>{assignment.title}</h3>
-                <p>{assignment.description}</p>
-                <p><strong>Due:</strong> {new Date(assignment.due_date).toLocaleString()}</p>
-              </div>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+            {assignments.map((assignment) => {
+              const submissionCount = getSubmissionCount(assignment.id);
+              return (
+                <div key={assignment.id} style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+                  <h3 style={{ margin: '0 0 10px 0' }}>{assignment.title}</h3>
+                  <p style={{ color: '#666', marginBottom: '10px' }}>{assignment.description}</p>
+                  <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+                    <strong>Due:</strong> {new Date(assignment.due_date).toLocaleString()}
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ 
+                      padding: '4px 8px', 
+                      backgroundColor: submissionCount > 0 ? '#28a745' : '#6c757d', 
+                      color: 'white', 
+                      borderRadius: '12px', 
+                      fontSize: '12px' 
+                    }}>
+                      {submissionCount} submission{submissionCount !== 1 ? 's' : ''}
+                    </span>
+                    <button
+                      onClick={() => viewAssignmentSubmissions(assignment)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      View Submissions
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-
-        {/* Submissions Section */}
+      ) : (
+        // Assignment Submissions View
         <div>
-          <h2>Student Submissions</h2>
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              onClick={backToAssignments}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginBottom: '15px'
+              }}
+            >
+              ← Back to Assignments
+            </button>
+            <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+              <h2 style={{ margin: '0 0 10px 0' }}>{selectedAssignment.title}</h2>
+              <p style={{ margin: '0 0 10px 0', color: '#666' }}>{selectedAssignment.description}</p>
+              <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                <strong>Due:</strong> {new Date(selectedAssignment.due_date).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <h3>Student Submissions ({assignmentSubmissions.length})</h3>
           <div>
-            {submissions.map((submission) => (
-              <div key={submission.id} style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '10px' }}>
-                <h4>{submission.assignments.title}</h4>
-                <p><strong>Student:</strong> {submission.profiles.name}</p>
-                <p><strong>Submitted:</strong> {new Date(submission.submitted_at).toLocaleString()}</p>
-                {submission.video_url && (
-                  <p><strong>Video:</strong> <a href={submission.video_url} target="_blank" rel="noopener noreferrer">View Video</a></p>
-                )}
-                {submission.score && (
-                  <p><strong>Score:</strong> {submission.score}/100</p>
-                )}
-                {(submission.word_choice_feedback || submission.body_language_feedback || submission.filler_word_feedback) && (
-                  <div style={{ marginTop: '15px' }}>
-                    <strong>AI Analysis Feedback:</strong>
-                    <div style={{ marginTop: '10px' }}>
-                      {submission.word_choice_feedback && (
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-                          <strong style={{ color: '#1976d2' }}>Word Choice:</strong>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.word_choice_feedback}</p>
-                        </div>
-                      )}
-                      {submission.body_language_feedback && (
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f3e5f5', borderRadius: '4px' }}>
-                          <strong style={{ color: '#7b1fa2' }}>Body Language:</strong>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.body_language_feedback}</p>
-                        </div>
-                      )}
-                      {submission.filler_word_feedback && (
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff3e0', borderRadius: '4px' }}>
-                          <strong style={{ color: '#f57c00' }}>Filler Words:</strong>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.filler_word_feedback}</p>
-                        </div>
-                      )}
+            {assignmentSubmissions.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+                No submissions yet for this assignment.
+              </p>
+            ) : (
+              assignmentSubmissions.map((submission) => (
+                <div key={submission.id} style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 5px 0' }}>{submission.profiles.name}</h4>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                        <strong>Submitted:</strong> {new Date(submission.submitted_at).toLocaleString()}
+                      </p>
                     </div>
+                    {submission.score && (
+                      <div style={{ padding: '4px 8px', backgroundColor: '#28a745', color: 'white', borderRadius: '4px', fontSize: '14px' }}>
+                        Score: {submission.score}/100
+                      </div>
+                    )}
                   </div>
-                )}
-                {submission.feedback_json && (
-                  <div style={{ marginTop: '10px' }}>
-                    <strong>Additional Feedback:</strong>
-                    <pre style={{ background: '#f8f9fa', padding: '10px', borderRadius: '4px', marginTop: '5px', fontSize: '12px' }}>
-                      {JSON.stringify(submission.feedback_json, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            ))}
+                  
+                  {submission.video_url && (
+                    <p style={{ marginBottom: '10px' }}>
+                      <strong>Video:</strong> <a href={submission.video_url} target="_blank" rel="noopener noreferrer">View Video</a>
+                    </p>
+                  )}
+                  
+                  {(submission.word_choice_feedback || submission.body_language_feedback || submission.filler_word_feedback) && (
+                    <div style={{ marginTop: '15px' }}>
+                      <strong>AI Analysis Feedback:</strong>
+                      <div style={{ marginTop: '10px' }}>
+                        {submission.word_choice_feedback && (
+                          <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+                            <strong style={{ color: '#1976d2' }}>Word Choice:</strong>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.word_choice_feedback}</p>
+                          </div>
+                        )}
+                        {submission.body_language_feedback && (
+                          <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f3e5f5', borderRadius: '4px' }}>
+                            <strong style={{ color: '#7b1fa2' }}>Body Language:</strong>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.body_language_feedback}</p>
+                          </div>
+                        )}
+                        {submission.filler_word_feedback && (
+                          <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff3e0', borderRadius: '4px' }}>
+                            <strong style={{ color: '#f57c00' }}>Filler Words:</strong>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.filler_word_feedback}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {submission.feedback_json && (
+                    <div style={{ marginTop: '10px' }}>
+                      <strong>Additional Feedback:</strong>
+                      <pre style={{ background: '#f8f9fa', padding: '10px', borderRadius: '4px', marginTop: '5px', fontSize: '12px' }}>
+                        {JSON.stringify(submission.feedback_json, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

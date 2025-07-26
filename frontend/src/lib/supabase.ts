@@ -5,6 +5,55 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Structured feedback interfaces
+export interface WordChoiceFeedback {
+  score: number | null;
+  description: string | null;
+}
+
+export interface BodyLanguageFeedback {
+  score: number | null;
+  description: string | null;
+}
+
+export interface FillerWordFeedback {
+  count: number;
+  score: number | null;
+  list: string[];
+  description: string | null;
+}
+
+// Helper functions to parse feedback JSON
+export const parseWordChoiceFeedback = (feedback: string | null): WordChoiceFeedback | null => {
+  if (!feedback) return null;
+  try {
+    const parsed = JSON.parse(feedback);
+    return typeof parsed === 'object' ? parsed : { score: null, description: feedback };
+  } catch {
+    return { score: null, description: feedback };
+  }
+};
+
+export const parseBodyLanguageFeedback = (feedback: string | null): BodyLanguageFeedback | null => {
+  if (!feedback) return null;
+  try {
+    const parsed = JSON.parse(feedback);
+    return typeof parsed === 'object' ? parsed : { score: null, description: feedback };
+  } catch {
+    return { score: null, description: feedback };
+  }
+};
+
+export const parseFillerWordFeedback = (feedback: string | null): FillerWordFeedback | null => {
+  if (!feedback) return null;
+  try {
+    const parsed = JSON.parse(feedback);
+    return typeof parsed === 'object' ? parsed : { count: 0, score: null, list: [], description: feedback };
+  } catch {
+    return { count: 0, score: null, list: [], description: feedback };
+  }
+};
+
 export type Database = {
   public: {
     Tables: {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase, parseWordChoiceFeedback, parseBodyLanguageFeedback, parseFillerWordFeedback } from '../../lib/supabase';
 import { VideoRecorder } from '../VideoRecorder';
 
 interface Assignment {
@@ -442,31 +442,142 @@ export function StudentDashboard() {
                 {submission.score && (
                   <p><strong>Score:</strong> {submission.score}/100</p>
                 )}
-                {(submission.word_choice_feedback || submission.body_language_feedback || submission.filler_word_feedback) && (
-                  <div style={{ marginTop: '15px' }}>
-                    <strong>AI Analysis Feedback:</strong>
-                    <div style={{ marginTop: '10px' }}>
-                      {submission.word_choice_feedback && (
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
-                          <strong style={{ color: '#1976d2' }}>Word Choice:</strong>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.word_choice_feedback}</p>
-                        </div>
-                      )}
-                      {submission.body_language_feedback && (
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f3e5f5', borderRadius: '4px' }}>
-                          <strong style={{ color: '#7b1fa2' }}>Body Language:</strong>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.body_language_feedback}</p>
-                        </div>
-                      )}
-                      {submission.filler_word_feedback && (
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff3e0', borderRadius: '4px' }}>
-                          <strong style={{ color: '#f57c00' }}>Filler Words:</strong>
-                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>{submission.filler_word_feedback}</p>
-                        </div>
-                      )}
+                {(submission.word_choice_feedback || submission.body_language_feedback || submission.filler_word_feedback) && (() => {
+                  const wordChoice = parseWordChoiceFeedback(submission.word_choice_feedback);
+                  const bodyLanguage = parseBodyLanguageFeedback(submission.body_language_feedback);
+                  const fillerWords = parseFillerWordFeedback(submission.filler_word_feedback);
+                  
+                  return (
+                    <div style={{ marginTop: '15px' }}>
+                      <strong>AI Analysis Feedback:</strong>
+                      <div style={{ marginTop: '10px' }}>
+                        {wordChoice && (
+                          <div style={{ marginBottom: '12px', padding: '12px', backgroundColor: '#e3f2fd', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <strong style={{ color: '#1976d2', fontSize: '16px' }}>Word Choice</strong>
+                              {wordChoice.score !== null && (
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  <div style={{ 
+                                    width: '60px', 
+                                    height: '8px', 
+                                    backgroundColor: '#e0e0e0', 
+                                    borderRadius: '4px',
+                                    marginRight: '8px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{ 
+                                      width: `${(wordChoice.score / 50) * 100}%`, 
+                                      height: '100%', 
+                                      backgroundColor: wordChoice.score >= 35 ? '#4caf50' : wordChoice.score >= 25 ? '#ff9800' : '#f44336',
+                                      borderRadius: '4px'
+                                    }}></div>
+                                  </div>
+                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#1976d2' }}>
+                                    {wordChoice.score}/50
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {wordChoice.description && (
+                              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.4' }}>{wordChoice.description}</p>
+                            )}
+                          </div>
+                        )}
+                        
+                        {bodyLanguage && (
+                          <div style={{ marginBottom: '12px', padding: '12px', backgroundColor: '#f3e5f5', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <strong style={{ color: '#7b1fa2', fontSize: '16px' }}>Body Language</strong>
+                              {bodyLanguage.score !== null && (
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                  <div style={{ 
+                                    width: '60px', 
+                                    height: '8px', 
+                                    backgroundColor: '#e0e0e0', 
+                                    borderRadius: '4px',
+                                    marginRight: '8px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{ 
+                                      width: `${(bodyLanguage.score / 50) * 100}%`, 
+                                      height: '100%', 
+                                      backgroundColor: bodyLanguage.score >= 35 ? '#4caf50' : bodyLanguage.score >= 25 ? '#ff9800' : '#f44336',
+                                      borderRadius: '4px'
+                                    }}></div>
+                                  </div>
+                                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#7b1fa2' }}>
+                                    {bodyLanguage.score}/50
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {bodyLanguage.description && (
+                              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.4' }}>{bodyLanguage.description}</p>
+                            )}
+                          </div>
+                        )}
+                        
+                        {fillerWords && (
+                          <div style={{ marginBottom: '12px', padding: '12px', backgroundColor: '#fff3e0', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <strong style={{ color: '#f57c00', fontSize: '16px' }}>Filler Words</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '14px', color: '#f57c00', fontWeight: 'bold' }}>
+                                  Count: {fillerWords.count}
+                                </span>
+                                {fillerWords.score !== null && (
+                                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <div style={{ 
+                                      width: '60px', 
+                                      height: '8px', 
+                                      backgroundColor: '#e0e0e0', 
+                                      borderRadius: '4px',
+                                      marginRight: '8px',
+                                      overflow: 'hidden'
+                                    }}>
+                                      <div style={{ 
+                                        width: `${(fillerWords.score / 25) * 100}%`, 
+                                        height: '100%', 
+                                        backgroundColor: fillerWords.score >= 18 ? '#4caf50' : fillerWords.score >= 12 ? '#ff9800' : '#f44336',
+                                        borderRadius: '4px'
+                                      }}></div>
+                                    </div>
+                                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#f57c00' }}>
+                                      {fillerWords.score}/25
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {fillerWords.list && fillerWords.list.length > 0 && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <strong style={{ fontSize: '12px', color: '#666' }}>Detected words:</strong>
+                                <div style={{ marginTop: '4px' }}>
+                                  {fillerWords.list.map((word, index) => (
+                                    <span key={index} style={{ 
+                                      display: 'inline-block',
+                                      padding: '2px 6px', 
+                                      backgroundColor: '#ffcc80', 
+                                      borderRadius: '12px', 
+                                      fontSize: '12px',
+                                      margin: '2px',
+                                      color: '#e65100'
+                                    }}>
+                                      {word}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {fillerWords.description && (
+                              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.4' }}>{fillerWords.description}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 {submission.feedback_json && (
                   <div style={{ marginTop: '10px' }}>
                     <strong>Additional Feedback:</strong>
